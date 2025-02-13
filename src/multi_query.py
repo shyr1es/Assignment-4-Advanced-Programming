@@ -1,6 +1,7 @@
 import chromadb
 from langchain_ollama import OllamaLLM
 import streamlit as st
+import pdfplumber  # Импортируем библиотеку для работы с PDF
 
 # Подключение к ChromaDB для хранения и поиска контекста
 chroma_client = chromadb.PersistentClient(path="chroma_db")
@@ -36,8 +37,42 @@ def query_ollama(prompt):
         print(f"Error querying Ollama: {e}")
         return "Error: Unable to process the query."
 
+def extract_text_from_pdf(file):
+    """Функция для извлечения текста из PDF с помощью pdfplumber."""
+    with pdfplumber.open(file) as pdf:
+        text = ""
+        for page in pdf.pages:
+            text += page.extract_text()
+        return text
+
 # Streamlit интерфейс
 st.title("AI Assistant for Kazakhstan Constitution")
+
+# Загрузка PDF файлов
+uploaded_files = st.file_uploader("Upload your Constitution PDF", accept_multiple_files=True, type=["pdf"])
+
+if uploaded_files:
+    documents = []
+    ids = []
+
+    for file in uploaded_files:
+        try:
+            # Извлечение текста из загруженных PDF файлов
+            file_content = extract_text_from_pdf(file)
+            documents.append(file_content)
+            ids.append(file.name)
+        except Exception as e:
+            st.error(f"Error reading file {file.name}: {e}")
+
+    if documents:
+        # Добавление документов в ChromaDB
+        add_documents_to_collection(documents, ids)
+        st.success(f"Uploaded and saved {len(uploaded_files)} documents.")
+        st.write("Documents saved:")
+        for doc in documents:
+            st.write(doc[:500] + ("..." if len(doc) > 500 else ""))  # Показываем часть текста для проверки
+    else:
+        st.warning("No valid documents uploaded.")
 
 # Ввод нескольких запросов
 queries = st.text_area("Enter your questions about the Constitution (separate with a newline):")
