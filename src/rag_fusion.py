@@ -30,7 +30,7 @@ llm_model = "llama3.2"
 def query_ollama(prompt):
     """Запрос к LLM Ollama для получения ответа."""
     try:
-        llm = OllamaLLM(model=llm_model, host="http://localhost:11434")  # Указываем хост и порт явно
+        llm = OllamaLLM(model=llm_model, host="http://localhost:11434")
         response = llm.invoke(prompt)
         return response
     except Exception as e:
@@ -66,26 +66,36 @@ if uploaded_files:
     else:
         st.warning("No valid documents uploaded.")
 
-# Ввод пользователя
-query = st.text_input("Enter your question about the Constitution:")
+# Ввод нескольких запросов
+queries = st.text_area("Enter your questions about the Constitution (separate with a newline):")
 
 if st.button("Submit"):
-    if query:
-        # Получение контекста из ChromaDB
-        chroma_results = query_chromadb(query)
+    if queries:
+        query_list = queries.split("\n")  # Разделение на отдельные запросы
+        
+        responses = []  # Список для хранения ответов
 
-        # Проверяем, есть ли контекст из документов
-        if chroma_results:
-            # Преобразуем все элементы контекста в строки, если они не строки
-            context = "\n\n".join([str(doc) for doc in chroma_results])
-            st.write("Context from Documents:")
-            st.write(context[:500] + ("..." if len(context) > 500 else ""))  # Показываем до 500 символов контекста
+        for query in query_list:
+            if query.strip():  # Проверяем, что запрос не пустой
+                # Получение контекста из ChromaDB для каждого запроса
+                chroma_results = query_chromadb(query)
 
-            # Формируем запрос с учётом контекста
-            query_with_context = f"Context: {context}\n\nQuestion: {query}"
-            response = query_ollama(query_with_context)
-        else:
-            st.warning("No relevant context found in uploaded documents. Using question only.")
-            response = query_ollama(query)
+                # Проверяем, есть ли контекст из документов
+                if chroma_results:
+                    # Преобразуем все элементы контекста в строки
+                    context = "\n\n".join([str(doc) for doc in chroma_results])
+                    st.write(f"Context from Documents for '{query}':")
+                    st.write(context[:500] + ("..." if len(context) > 500 else ""))  # Показываем до 500 символов контекста
 
-        st.write("Answer:", response)
+                    # Формируем запрос с учётом контекста
+                    query_with_context = f"Context: {context}\n\nQuestion: {query}"
+                    response = query_ollama(query_with_context)
+                else:
+                    st.warning(f"No relevant context found in uploaded documents for '{query}'. Using question only.")
+                    response = query_ollama(query)
+
+                responses.append(f"Answer to '{query}': {response}")
+        
+        # Показываем все ответы
+        for response in responses:
+            st.write(response)
